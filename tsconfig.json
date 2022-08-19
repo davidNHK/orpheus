@@ -1,0 +1,8 @@
+{
+  "compilerOptions": {
+    "types": ["cypress", "@testing-library/cypress"]
+  },
+  "extends": "@busybox/tsconfig/tsconfig-react.json",
+  "include": ["src", "cypress/support/component.d.ts"],
+  "references": [{ "path": "./tsconfig.node.json" }]
+}
