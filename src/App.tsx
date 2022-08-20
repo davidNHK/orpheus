@@ -142,7 +142,10 @@ function App() {
           {midiJson && <pre>{JSON.stringify(midiJson, null, 4)}</pre>}
         </Layout.Main>
       </Layout.Content>
-      <Layout.Footer>Footer</Layout.Footer>
+      <Layout.Footer>
+        <Divider />
+        Footer
+      </Layout.Footer>
     </Layout.Page>
   );
 }
