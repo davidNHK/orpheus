@@ -11,17 +11,17 @@ import {
   noteFramesToTime,
   outputToNotesPoly,
 } from '@spotify/basic-pitch';
-import basicPitchModel from '@spotify/basic-pitch/model/model.json';
+import basicPitchModel from '@spotify/basic-pitch/model/model.json?url';
 import { Midi, MidiJSON } from '@tonejs/midi';
-import { ChangeEvent, useState } from 'react';
+import { ChangeEvent, useEffect, useState } from 'react';
 
 function AudioSourceProvider({
   onRecordedAudioSource,
 }: {
-  onRecordedAudioSource: (
-    e: CustomEvent<{ toneJSMidiJSON: MidiJSON; value: AudioBuffer }>,
-  ) => void;
+  onRecordedAudioSource: (e: CustomEvent<{ toneJSMidiJSON: MidiJSON }>) => void;
 }) {
+  const [progress, updateProgress] = useState<number>(1);
+  const [midiJson, setMidiJSON] = useState<MidiJSON | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   async function noteEventTimeToMidiJSON(notes: NoteEventTime[]) {
     const midi = new Midi();
@@ -60,7 +60,7 @@ function AudioSourceProvider({
       sampleRate: 22050, // https://github.com/spotify/basic-pitch-ts/blob/16d4c6a68e2c070726ba7c26a64c13eab4a434c4/src/inference.ts#L35
     });
     const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
-    const basicPitch = new BasicPitch(basicPitchModel as any);
+    const basicPitch = new BasicPitch(basicPitchModel);
     const noteEventTimes = await new Promise<NoteEventTime[]>(resolve =>
       basicPitch.evaluateModel(
         audioBuffer.getChannelData(0),
@@ -71,54 +71,56 @@ function AudioSourceProvider({
             ),
           );
         },
-        // eslint-disable-next-line @typescript-eslint/no-empty-function
-        () => {},
+        p => {
+          updateProgress(p);
+        },
       ),
     );
     return { audioBuffer, noteEventTimes };
   }
+  useEffect(() => {
+    if (!(progress >= 1) || !midiJson) return;
+    onRecordedAudioSource(
+      new CustomEvent('recorded-audio-source', {
+        detail: {
+          toneJSMidiJSON: midiJson,
+        },
+      }),
+    );
+    setMidiJSON(null);
+    updateProgress(0);
+  }, [midiJson, onRecordedAudioSource, progress]);
   return (
-    <section className={'tw-my-2 tw-flex tw-content-center'}>
-      {!isRecording && (
-        <FileUpload
-          onChange={async (e: ChangeEvent<HTMLInputElement>) => {
-            if (!e.target.files) return;
-            const [file] = e.target.files;
-            const { audioBuffer, noteEventTimes } = await blobToNoteEventTime(
-              file,
-            );
-            onRecordedAudioSource(
-              new CustomEvent('uploaded-audio-source', {
-                detail: {
-                  toneJSMidiJSON: await noteEventTimeToMidiJSON(noteEventTimes),
-                  value: audioBuffer,
-                },
+    <section className={'tw-my-2 tw-flex tw-flex-col'}>
+      <section className={'tw-flex tw-content-center'}>
+        {!isRecording && (
+          <FileUpload
+            onChange={async (e: ChangeEvent<HTMLInputElement>) => {
+              if (!e.target.files) return;
+              const [file] = e.target.files;
+              const { noteEventTimes } = await blobToNoteEventTime(file);
+              setMidiJSON(await noteEventTimeToMidiJSON(noteEventTimes));
+            }}
+          >
+            Click to Upload
+          </FileUpload>
+        )}
+        <AudioRecorder
+          onStartRecording={() => setIsRecording(true)}
+          onStopRecording={async e => {
+            setIsRecording(false);
+            const { noteEventTimes } = await blobToNoteEventTime(
+              new Blob(e.detail.value, {
+                type: 'audio/webm',
               }),
             );
+            setMidiJSON(await noteEventTimeToMidiJSON(noteEventTimes));
           }}
-        >
-          Click to Upload
-        </FileUpload>
+        />
+      </section>
+      {progress > 0 && progress < 1 && (
+        <section>{Math.ceil(progress * 100)}%</section>
       )}
-      <AudioRecorder
-        onStartRecording={() => setIsRecording(true)}
-        onStopRecording={async e => {
-          setIsRecording(false);
-          const { audioBuffer, noteEventTimes } = await blobToNoteEventTime(
-            new Blob(e.detail.value, {
-              type: 'audio/webm',
-            }),
-          );
-          onRecordedAudioSource(
-            new CustomEvent('recorded-audio-source', {
-              detail: {
-                toneJSMidiJSON: await noteEventTimeToMidiJSON(noteEventTimes),
-                value: audioBuffer,
-              },
-            }),
-          );
-        }}
-      />
     </section>
   );
 }
