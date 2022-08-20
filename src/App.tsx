@@ -91,7 +91,7 @@ function AudioSourceProvider({
     updateProgress(0);
   }, [midiJson, onRecordedAudioSource, progress]);
   return (
-    <section className={'tw-my-2 tw-flex tw-flex-col'}>
+    <div className={'tw-my-2 tw-flex tw-flex-col'}>
       <section className={'tw-flex tw-content-center'}>
         {!isRecording && (
           <FileUpload
@@ -121,7 +121,7 @@ function AudioSourceProvider({
       {progress > 0 && progress < 1 && (
         <section>{Math.ceil(progress * 100)}%</section>
       )}
-    </section>
+    </div>
   );
 }
 
